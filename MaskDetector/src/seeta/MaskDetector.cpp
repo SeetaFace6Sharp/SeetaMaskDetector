@@ -20,7 +20,6 @@
 #include "orz/io/stream/filestream.h"
 #endif
 
-
 #include "model_helper.h"
 
 #define VER_HEAD(x) #x "."
@@ -31,9 +30,7 @@
 #define FUN_SINOR(x) VER_TAIL(x)
 
 #define LIBRARY_VERSION GENERATE_VER( \
-                                      (SEETA_POSE_ESTIMATOR_MAJOR_VERSION) \
-                                      (SEETA_POSE_ESTIMATOR_MINOR_VERSION) \
-                                      (SEETA_POSE_ESTIMATOR_SINOR_VERSION))
+    (SEETA_POSE_ESTIMATOR_MAJOR_VERSION)(SEETA_POSE_ESTIMATOR_MINOR_VERSION)(SEETA_POSE_ESTIMATOR_SINOR_VERSION))
 
 #define LIBRARY_NAME "PoseEstimator"
 
@@ -46,16 +43,19 @@
 #include <lock/macro.h>
 #endif
 
-namespace seeta {
-    namespace v2 {
+namespace seeta
+{
+    namespace v2
+    {
         using namespace ts::api;
 
-        static int CLAMP(int a, int min, int max) {
+        static int CLAMP(int a, int min, int max)
+        {
             return std::max(min, std::min(max, a));
         }
 
-
-        static SeetaRect V6toV5(const SeetaSize &limit, const SeetaRect &face) {
+        static SeetaRect V6toV5(const SeetaSize &limit, const SeetaRect &face)
+        {
             /**
              * INFO: width scale: 1.1311
              * INFO: height scale: 1.13779
@@ -87,62 +87,79 @@ namespace seeta {
             return rect;
         }
 
-
-        static std::string read_txt_file(std::ifstream &in) {
+        static std::string read_txt_file(std::ifstream &in)
+        {
             std::ostringstream tmp;
             tmp << in.rdbuf();
             return tmp.str();
         }
 
-        static orz::jug read_jug_from_json_or_sta(const std::string &filename) {
+        static orz::jug read_jug_from_json_or_sta(const std::string &filename)
+        {
             std::ifstream ifs(filename, std::ios::binary);
             int32_t mark;
-            ifs.read(reinterpret_cast<char *>( &mark ), 4);
+            ifs.read(reinterpret_cast<char *>(&mark), 4);
 
-            try {
-                if (mark == orz::STA_MASK) {
+            try
+            {
+                if (mark == orz::STA_MASK)
+                {
                     return orz::jug_read(ifs);
-                } else {
+                }
+                else
+                {
                     std::string json = read_txt_file(ifs);
                     return orz::json2jug(json);
                 }
             }
-            catch (const orz::Exception &) {
+            catch (const orz::Exception &)
+            {
                 ORZ_LOG(orz::ERROR) << "Model must be sta or json file, given: " << filename << orz::crash;
                 return orz::jug();
             }
         }
 
-        static Module parse_tsm_module(const orz::jug &model, const std::string &root) {
-            if (model.valid(orz::Piece::BINARY)) {
+        static Module parse_tsm_module(const orz::jug &model, const std::string &root)
+        {
+            if (model.valid(orz::Piece::BINARY))
+            {
                 auto binary = model.to_binary();
                 BufferReader reader(binary.data(), binary.size());
                 return Module::Load(reader);
-            } else if (model.valid(orz::Piece::STRING)) {
+            }
+            else if (model.valid(orz::Piece::STRING))
+            {
                 auto commands = orz::Split(model.to_string(), '@', 3);
-                if (commands.size() != 3 || !commands[0].empty() || commands[1] != "file") {
+                if (commands.size() != 3 || !commands[0].empty() || commands[1] != "file")
+                {
                     ORZ_LOG(orz::ERROR) << R"(Model: /backbone/tsm must be "@file@..." or "@binary@...")" << orz::crash;
                 }
                 std::string path = root.empty() ? commands[2] : orz::Join({root, commands[2]}, orz::FileSeparator());
                 return Module::Load(path);
-            } else {
+            }
+            else
+            {
                 ORZ_LOG(orz::ERROR) << R"(Model: /backbone/tsm must be "@file@..." or "@binary@...")" << orz::crash;
             }
             return Module();
         }
 
-        struct ModelParam {
+        struct ModelParam
+        {
             ModelParam() = default;
 
             std::vector<orz::jug> pre_processor;
 
-            struct {
+            struct
+            {
                 orz::jug tsm;
             } backbone;
 
-            struct {
+            struct
+            {
                 float threshold = 0.5f;
-                struct {
+                struct
+                {
                     std::string format = "HWC";
                     int height = 128;
                     int width = 128;
@@ -150,81 +167,106 @@ namespace seeta {
                 } input;
             } global;
 
-            static bool to_bool(const orz::jug &jug) {
+            static bool to_bool(const orz::jug &jug)
+            {
                 return jug.to_bool();
             }
 
-            static std::vector<int> to_int_list(const orz::jug &jug) {
-                if (jug.invalid(orz::Piece::LIST)) throw orz::Exception("jug must be list");
+            static std::vector<int> to_int_list(const orz::jug &jug)
+            {
+                if (jug.invalid(orz::Piece::LIST))
+                    throw orz::Exception("jug must be list");
                 std::vector<int> list(jug.size());
-                for (size_t i = 0; i < list.size(); ++i) {
+                for (size_t i = 0; i < list.size(); ++i)
+                {
                     list[i] = jug[i].to_int();
                 }
                 return std::move(list);
             }
 
-            static std::vector<std::vector<int>> to_int_list_list(const orz::jug &jug) {
-                if (jug.invalid(orz::Piece::LIST)) throw orz::Exception("jug must be list");
+            static std::vector<std::vector<int>> to_int_list_list(const orz::jug &jug)
+            {
+                if (jug.invalid(orz::Piece::LIST))
+                    throw orz::Exception("jug must be list");
                 std::vector<std::vector<int>> list(jug.size());
-                for (size_t i = 0; i < list.size(); ++i) {
+                for (size_t i = 0; i < list.size(); ++i)
+                {
                     list[i] = to_int_list(jug[i]);
                 }
                 return std::move(list);
             }
 
-            static std::vector<float> to_float_list(const orz::jug &jug) {
-                if (jug.invalid(orz::Piece::LIST)) throw orz::Exception("jug must be list");
+            static std::vector<float> to_float_list(const orz::jug &jug)
+            {
+                if (jug.invalid(orz::Piece::LIST))
+                    throw orz::Exception("jug must be list");
                 std::vector<float> list(jug.size());
-                for (size_t i = 0; i < list.size(); ++i) {
+                for (size_t i = 0; i < list.size(); ++i)
+                {
                     list[i] = jug[i].to_float();
                 }
                 return std::move(list);
             }
 
-            static std::vector<std::vector<float>> to_float_list_list(const orz::jug &jug) {
-                if (jug.invalid(orz::Piece::LIST)) throw orz::Exception("jug must be list");
+            static std::vector<std::vector<float>> to_float_list_list(const orz::jug &jug)
+            {
+                if (jug.invalid(orz::Piece::LIST))
+                    throw orz::Exception("jug must be list");
                 std::vector<std::vector<float>> list(jug.size());
-                for (size_t i = 0; i < list.size(); ++i) {
+                for (size_t i = 0; i < list.size(); ++i)
+                {
                     list[i] = to_float_list(jug[i]);
                 }
                 return std::move(list);
             }
         };
 
-
-        ModelParam parse_model(const orz::jug &model) {
+        ModelParam parse_model(const orz::jug &model)
+        {
             ModelParam param;
 
-            if (model.invalid(orz::Piece::DICT)) ORZ_LOG(orz::ERROR) << "Model: / must be dict" << orz::crash;
+            if (model.invalid(orz::Piece::DICT))
+                ORZ_LOG(orz::ERROR) << "Model: / must be dict" << orz::crash;
 
             auto pre_processor = model["pre_processor"];
             auto backbone = model["backbone"];
             auto global = model["global"];
 
-            if (pre_processor.valid()) {
-                if (pre_processor.valid(orz::Piece::LIST)) {
+            if (pre_processor.valid())
+            {
+                if (pre_processor.valid(orz::Piece::LIST))
+                {
                     auto size = pre_processor.size();
-                    for (decltype(size) i = 0; i < size; ++i) {
+                    for (decltype(size) i = 0; i < size; ++i)
+                    {
                         param.pre_processor.emplace_back(pre_processor[i]);
                     }
-                } else {
+                }
+                else
+                {
                     ORZ_LOG(orz::ERROR) << "Model: /pre_processor must be list" << orz::crash;
                 }
             }
 
-            if (backbone.valid(orz::Piece::DICT)) {
+            if (backbone.valid(orz::Piece::DICT))
+            {
                 auto tsm = backbone["tsm"];
-                if (tsm.invalid()) {
+                if (tsm.invalid())
+                {
                     ORZ_LOG(orz::ERROR) << R"(Model: /backbone/tsm must be "@file@..." or "@binary@...")" << orz::crash;
                 }
                 param.backbone.tsm = tsm;
-            } else {
+            }
+            else
+            {
                 ORZ_LOG(orz::ERROR) << "Model: /backbone must be dict" << orz::crash;
             }
 
-            if (global.valid(orz::Piece::DICT)) {
+            if (global.valid(orz::Piece::DICT))
+            {
                 auto input = global["input"];
-                if (input.invalid(orz::Piece::DICT)) ORZ_LOG(orz::ERROR) << "Model: /global/input must be dict" << orz::crash;
+                if (input.invalid(orz::Piece::DICT))
+                    ORZ_LOG(orz::ERROR) << "Model: /global/input must be dict" << orz::crash;
 
                 decltype(param.global.input) param_input;
                 param_input.format = orz::jug_get<std::string>(input["format"], param_input.format);
@@ -233,136 +275,188 @@ namespace seeta {
                 param_input.channels = orz::jug_get<int>(input["channels"], param_input.channels);
                 param.global.input = param_input;
 
-                if (param_input.format != "HWC") {
+                if (param_input.format != "HWC")
+                {
                     ORZ_LOG(orz::ERROR) << "Model: /global/input/format must be HWC" << orz::crash;
                 }
 
                 param.global.threshold = orz::jug_get<float>(global["threshold"], param.global.threshold);
-            } else {
+            }
+            else
+            {
                 ORZ_LOG(orz::ERROR) << "Model: /global must be dict" << orz::crash;
             }
 
             return param;
         }
 
-        Device to_ts_device(const seeta::ModelSetting &setting) {
-            switch (setting.get_device()) {
-                case seeta::ModelSetting::Device::AUTO:
-                    return Device("cpu");
-                case seeta::ModelSetting::Device::CPU:
-                    return Device("cpu");
-                case seeta::ModelSetting::Device::GPU:
-                    return Device("gpu", setting.id);
-                default:
-                    return Device("cpu");
+        Device to_ts_device(const seeta::ModelSetting &setting)
+        {
+            switch (setting.get_device())
+            {
+            case seeta::ModelSetting::Device::AUTO:
+                return Device("cpu");
+            case seeta::ModelSetting::Device::CPU:
+                return Device("cpu");
+            case seeta::ModelSetting::Device::GPU:
+                return Device("gpu", setting.id);
+            default:
+                return Device("cpu");
             }
         }
 
-
-        static void build_filter(ImageFilter &filter, const std::vector<orz::jug> &pre_processor) {
+        static void build_filter(ImageFilter &filter, const std::vector<orz::jug> &pre_processor)
+        {
             filter.clear();
-            for (size_t i = 0; i < pre_processor.size(); ++i) {
+            for (size_t i = 0; i < pre_processor.size(); ++i)
+            {
                 auto &processor = pre_processor[i];
-                if (processor.invalid(orz::Piece::DICT)) {
+                if (processor.invalid(orz::Piece::DICT))
+                {
                     ORZ_LOG(orz::ERROR) << "Model: the " << i << "-th processor \"" << processor << "\" should be dict"
                                         << orz::crash;
                 }
                 auto op = orz::jug_get<std::string>(processor["op"], "");
-                if (op.empty()) {
+                if (op.empty())
+                {
                     ORZ_LOG(orz::ERROR) << R"(Model: processor should be set like {"op": "to_float"}.)" << orz::crash;
                 }
-                if (op == "to_float") {
+                if (op == "to_float")
+                {
                     filter.to_float();
-                } else if (op == "to_chw") {
+                }
+                else if (op == "to_chw")
+                {
                     filter.to_chw();
-                } else if (op == "sub_mean") {
+                }
+                else if (op == "sub_mean")
+                {
                     std::vector<float> mean;
-                    try {
+                    try
+                    {
                         mean = ModelParam::to_float_list(processor["mean"]);
                     }
-                    catch (...) {}
-                    if (mean.empty()) {
+                    catch (...)
+                    {
+                    }
+                    if (mean.empty())
+                    {
                         ORZ_LOG(orz::ERROR)
-                                << R"(Model: processor "sub_mean" must set "mean" like "{"op": "sub_mean", "mean": [104, 117, 123]}")"
-                                << orz::crash;
+                            << R"(Model: processor "sub_mean" must set "mean" like "{"op": "sub_mean", "mean": [104, 117, 123]}")"
+                            << orz::crash;
                     }
                     filter.sub_mean(mean);
-                } else if (op == "center_crop") {
+                }
+                else if (op == "center_crop")
+                {
                     std::vector<int> size;
-                    try {
+                    try
+                    {
                         size = ModelParam::to_int_list(processor["size"]);
                     }
-                    catch (...) {}
-                    if (size.empty()) {
-                        ORZ_LOG(orz::ERROR)
-                                << R"(Model: processor "center_crop" must set "mean" like "{"op": "center_crop", "size": [248, 248]}")"
-                                << orz::crash;
+                    catch (...)
+                    {
                     }
-                    if (size.size() == 1) {
+                    if (size.empty())
+                    {
+                        ORZ_LOG(orz::ERROR)
+                            << R"(Model: processor "center_crop" must set "mean" like "{"op": "center_crop", "size": [248, 248]}")"
+                            << orz::crash;
+                    }
+                    if (size.size() == 1)
+                    {
                         filter.center_crop(size[0]);
-                    } else {
+                    }
+                    else
+                    {
                         filter.center_crop(size[0], size[1]);
                     }
-                } else if (op == "resize") {
+                }
+                else if (op == "resize")
+                {
                     std::vector<int> size;
-                    try {
+                    try
+                    {
                         size = ModelParam::to_int_list(processor["size"]);
                     }
-                    catch (...) {}
-                    if (size.empty()) {
-                        ORZ_LOG(orz::ERROR)
-                                << R"(Model: processor "resize" must set "mean" like "{"op": "resize", "size": [248, 248]}")"
-                                << orz::crash;
+                    catch (...)
+                    {
                     }
-                    if (size.size() == 1) {
+                    if (size.empty())
+                    {
+                        ORZ_LOG(orz::ERROR)
+                            << R"(Model: processor "resize" must set "mean" like "{"op": "resize", "size": [248, 248]}")"
+                            << orz::crash;
+                    }
+                    if (size.size() == 1)
+                    {
                         filter.resize(size[0]);
-                    } else {
+                    }
+                    else
+                    {
                         filter.resize(size[0], size[1]);
                     }
-                } else if (op == "prewhiten") {
+                }
+                else if (op == "prewhiten")
+                {
                     filter.prewhiten();
-                } else if (op == "channel_swap") {
+                }
+                else if (op == "channel_swap")
+                {
                     std::vector<int> shuffle;
-                    try {
+                    try
+                    {
                         shuffle = ModelParam::to_int_list(processor["shuffle"]);
                     }
-                    catch (...) {}
-                    if (shuffle.size() != 3) {
+                    catch (...)
+                    {
+                    }
+                    if (shuffle.size() != 3)
+                    {
                         ORZ_LOG(orz::ERROR)
-                                << R"(Model: processor "resize" must set "mean" like "{"op": "channel_swap", "shuffle": [2, 1, 0]}")"
-                                << orz::crash;
+                            << R"(Model: processor "resize" must set "mean" like "{"op": "channel_swap", "shuffle": [2, 1, 0]}")"
+                            << orz::crash;
                     }
                     filter.channel_swap(shuffle);
-                } else {
+                }
+                else
+                {
                     ORZ_LOG(orz::ERROR) << "Model: processor \"" << processor << "\" not supported." << orz::crash;
                 }
             }
         }
 
-        static std::string to_string(const std::vector<int> &shape) {
+        static std::string to_string(const std::vector<int> &shape)
+        {
             std::ostringstream oss;
             oss << "[";
-            for (size_t i = 0; i < shape.size(); ++i) {
-                if (i) oss << ", ";
+            for (size_t i = 0; i < shape.size(); ++i)
+            {
+                if (i)
+                    oss << ", ";
                 oss << shape[i];
             }
             oss << "]";
             return oss.str();
-            (void) (to_string);
+            (void)(to_string);
         }
 
-        static float raw2degree(float raw) {
+        static float raw2degree(float raw)
+        {
             return float((1.0 / (1.0 + std::exp(-raw))) * 180.0 - 90.0);
         }
 
-        class MaskDetector::Implement {
+        class MaskDetector::Implement
+        {
         public:
-            Implement(const seeta::ModelSetting &setting) {
+            Implement(const seeta::ModelSetting &setting)
+            {
                 auto &model = setting.get_model();
-                if (model.size() != 1) {
+                if (model.size() != 1)
+                {
                     ORZ_LOG(orz::ERROR) << "Must have 1 model." << orz::crash;
                 }
-				
+
                 auto jug = get_model_jug(model[0].c_str());
 
                 auto param = parse_model(jug);
@@ -381,16 +475,16 @@ namespace seeta {
 
                 this->m_param = param;
                 this->m_bench = bench;
-
             }
 
-
-            bool detect(const SeetaImageData &image, const SeetaRect &info, float &score) {
+            bool detect(const SeetaImageData &image, const SeetaRect &info, float &score)
+            {
 #ifdef SEETA_CHECK_AUTO_FUNCID
                 SEETA_CHECK_AUTO_FUNCID("MaskDetector");
 #endif
                 score = 0;
-                if (!image.data || image.channels != 3) {
+                if (!image.data || image.channels != 3)
+                {
                     return false;
                 }
 
@@ -401,7 +495,6 @@ namespace seeta {
 
                 seeta::Size size(m_param.global.input.height, m_param.global.input.width);
                 seeta::Rect rect(facerect.x, facerect.y, facerect.width, facerect.height);
-
 
                 seeta::Image cropped_face = seeta::crop_resize(image, rect, size);
 
@@ -418,25 +511,24 @@ namespace seeta {
 
             ModelParam m_param;
             mutable Workbench m_bench;
-
         };
-
 
         //////////////////////////////////////
 
-        MaskDetector::MaskDetector(const seeta::ModelSetting &setting)
-                : m_impl(new Implement(setting)) {
+        MaskDetector::MaskDetector(const SeetaModelSetting &setting)
+            : m_impl(new Implement(setting))
+        {
         }
 
-        MaskDetector::~MaskDetector() {
+        MaskDetector::~MaskDetector()
+        {
             delete m_impl;
         }
 
-
-        bool MaskDetector::detect(const SeetaImageData &image, const SeetaRect &face, float *score) {
+        bool MaskDetector::detect(const SeetaImageData &image, const SeetaRect &face, float *score)
+        {
             float tmp;
             return m_impl->detect(image, face, score ? *score : tmp);
         }
     }
 }
-
